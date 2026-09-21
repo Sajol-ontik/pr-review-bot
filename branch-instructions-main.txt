@@ -1,0 +1,37 @@
+This is a RAG chatbot (Express/Gemini proxy + React + IndexedDB + PDF parsing).
+
+SECURITY (highest priority):
+- NEVER expose the Gemini API key in client-side code, frontend bundles, or error responses. The key must only be read from .env on the server (process.env.API_KEY || process.env.GEMINI_API_KEY).
+- No logging or serializing full error objects that leak raw API errors, stack traces, or request bodies. sanitizeError() must not echo user data.
+- Review all code that embeds user query or PDF text into prompts. Flag prompt-injection vectors where attacker-controlled content inside <doc> tags can override system instructions.
+- Flag any permissive CORS config (plain cors() means allow all origins). Require an explicit allowlist for production.
+- Flag missing input validation, missing rate limiting on /api/chat, and unhandled access of req.body fields.
+
+TYPE SAFETY:
+- No new `any` types. All new functions must have explicit return types.
+- req/res handlers must be typed (Request/Response from express), not `any`.
+
+ERROR HANDLING:
+- Every await of Gemini, pdfjs, or IndexedDB must have try/catch with a user-safe message. No swallowed errors.
+- A swallowed `continue` in the model-fallback loop must be justified with a comment.
+- Validate prompt/query length and PDF page count before processing.
+
+RAG AND PROMPT QUALITY:
+- Chunking/context windowing must remain bounded (max chunks + max chars per chunk). No unbounded context assembly.
+- System instruction must always constrain the model to answer only from provided context and state when documents are insufficient.
+- Conversation history truncation must stay bounded (e.g. last 4-6 messages) to avoid token blowup.
+
+DATABASE / PERSISTENCE:
+- All IndexedDB reads/writes must declare their object store and transaction mode, wrapped in error handling.
+- Database version upgrades must be additive and must not silently drop existing stores.
+
+PERFORMANCE:
+- PDF extraction must not block the main thread; large files need progress reporting or chunking.
+- No repeated initDB() calls per operation. Reuse a cached connection.
+
+TESTING:
+- Logic touching prompt building, chunking, or the fallback chain should be refactored into pure functions and unit tested.
+
+FRONTEND:
+- No API keys, tokens, or secrets in components/utils.
+- AdminPanel and ChatBot must sanitize rendered model output. Do not inject raw HTML.

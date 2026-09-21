@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ repo.owner }}/{{ repo.repo }} — PR Review Bot</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f6f8fa; color: #1f2328; }
+        .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+        h1 { font-size: 22px; margin-bottom: 4px; }
+        .sub { color: #57606a; margin-bottom: 24px; font-size: 14px; }
+        a.back { color: #0969da; text-decoration: none; font-size: 14px; }
+        a.back:hover { text-decoration: underline; }
+        .card { background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .card h2 { font-size: 16px; margin-bottom: 16px; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+        input, textarea { padding: 8px 12px; border: 1px solid #d0d7de; border-radius: 6px; font-size: 14px; }
+        input[type="text"] { flex: 1; min-width: 150px; }
+        textarea { width: 100%; min-height: 100px; resize: vertical; font-family: monospace; }
+        button { padding: 8px 16px; background: #1f883d; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+        button:hover { background: #1a7f37; }
+        .danger { background: #dc2626; }
+        .danger:hover { background: #b91c1c; }
+        .secondary { background: #0969da; }
+        .secondary:hover { background: #0a5ed7; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #d0d7de; font-size: 14px; vertical-align: top; }
+        th { font-size: 12px; text-transform: uppercase; color: #57606a; background: #f6f8fa; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-enabled { background: #dafbe1; color: #1a7f37; }
+        .badge-disabled { background: #ffebe9; color: #d1242f; }
+        .badge-pass { background: #dafbe1; color: #1a7f37; }
+        .badge-fail { background: #ffebe9; color: #d1242f; }
+        .badge-pending { background: #fff8c5; color: #9a6700; }
+        .badge-error { background: #ffebe9; color: #d1242f; }
+        .review-body { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 14px; white-space: pre-wrap; font-size: 13px; max-height: 300px; overflow-y: auto; }
+        .score { font-weight: 700; font-size: 16px; }
+        .empty { text-align: center; color: #57606a; padding: 30px; }
+        .muted { color: #57606a; font-size: 12px; }
+        .inline-form { display: inline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a class="back" href="/dashboard">← Back to Dashboard</a>
+        <h1>{{ repo.owner }}/{{ repo.repo }}</h1>
+        <p class="sub">
+            Installation #{{ repo.installation_id }} ·
+            {% if repo.is_enabled %}
+            <span class="badge badge-enabled">Enabled</span>
+            {% else %}
+            <span class="badge badge-disabled">Disabled</span>
+            {% endif %}
+        </p>
+
+        <div class="card">
+            <h2>Branch Instructions</h2>
+            <p class="muted" style="margin-bottom: 12px;">
+                Each branch can have custom review instructions. The AI reviewer follows them when reviewing PRs merged into that branch.
+            </p>
+            <form method="POST" action="/dashboard/repos/{{ repo.id }}/branches">
+                <div class="form-row">
+                    <input type="text" name="branch" placeholder="Branch name (e.g. main, develop, release)" required>
+                </div>
+                <textarea name="custom_instructions" placeholder="Custom review instructions, e.g.:
+- Enforce TypeScript strict mode
+- No inline SQL — use the repository layer
+- Every endpoint needs unit tests
+- Check for missing error handling on network calls"></textarea>
+                <div style="margin-top: 10px;">
+                    <button type="submit">Add Branch</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Configured Branches</h2>
+            {% if branches %}
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Branch</th>
+                        <th>Instructions</th>
+                        <th style="width: 10%;">Status</th>
+                        <th style="width: 20%;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in branches %}
+                    <tr>
+                        <td><strong>{{ b.branch }}</strong></td>
+                        <td data-branch-id="{{ b.id }}">
+                            <details>
+                                <summary class="muted">View / edit instructions</summary>
+                                <form method="POST" action="/dashboard/branches/{{ b.id }}/update" style="margin-top: 8px;">
+                                    <textarea name="custom_instructions">{{ b.custom_instructions }}</textarea>
+                                    <button type="submit" class="secondary" style="margin-top: 8px;">Save</button>
+                                </form>
+                            </details>
+                        </td>
+                        <td>
+                            {% if b.is_enabled %}
+                            <span class="badge badge-enabled">On</span>
+                            {% else %}
+                            <span class="badge badge-disabled">Off</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form class="inline-form" method="POST" action="/dashboard/branches/{{ b.id }}/toggle">
+                                <button type="submit" class="secondary" style="padding: 4px 10px; font-size: 12px;">Toggle</button>
+                            </form>
+                            <form class="inline-form" method="POST" action="/dashboard/branches/{{ b.id }}/delete">
+                                <button type="submit" class="danger" style="padding: 4px 10px; font-size: 12px;">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">No branches configured. Add one above.</div>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2>Recent Reviews</h2>
+            {% if reviews %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>PR</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Review</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rv in reviews %}
+                    <tr>
+                        <td><a href="https://github.com/{{ repo.owner }}/{{ repo.repo }}/pull/{{ rv.pr_number}}" target="_blank" class="back">#{{ rv.pr_number }}</a></td>
+                        <td>
+                            <span class="score {% if rv.score >= 70 %}score-high{% else %}score-low{% endif %}">{{ rv.score }}/100</span>
+                        </td>
+                        <td>
+                            {% if rv.status == 'pass' %}
+                            <span class="badge badge-pass">PASS</span>
+                            {% elif rv.status == 'fail' %}
+                            <span class="badge badge-fail">FAIL</span>
+                            {% elif rv.status == 'pending' %}
+                            <span class="badge badge-pending">PENDING</span>
+                            {% else %}
+                            <span class="badge badge-error">ERROR</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ rv.created_at.strftime('%Y-%m-%d %H:%M') if rv.created_at else '—' }}</td>
+                        <td>
+                            <details>
+                                <summary class="muted">View</summary>
+                                <div class="review-body">{{ rv.body }}</div>
+                            </details>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">No reviews yet. Open a PR in this repository to trigger a review.</div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

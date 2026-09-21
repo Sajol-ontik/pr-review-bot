@@ -1,0 +1,1 @@
+from pr_review.db.session import Base  # noqa: F401 — import for Alembic/migration discovery
