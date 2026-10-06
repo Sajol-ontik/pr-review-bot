@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
+    <script>
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
     <title>{{ repo.owner }}/{{ repo.repo }} — PR Review Bot</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -39,12 +47,22 @@
         .empty { text-align: center; color: #57606a; padding: 30px; }
         .muted { color: #57606a; font-size: 12px; }
         .inline-form { display: inline; }
+        .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+        button.logout { background: #fff; color: #1f2328; border: 1px solid #d0d7de; }
+        button.logout:hover { background: #f3f4f6; }
     </style>
 </head>
 <body>
     <div class="container">
-        <a class="back" href="/dashboard">← Back to Dashboard</a>
-        <h1>{{ repo.owner }}/{{ repo.repo }}</h1>
+        <div class="page-head">
+            <div>
+                <a class="back" href="/dashboard">← Back to Dashboard</a>
+                <h1>{{ repo.owner }}/{{ repo.repo }}</h1>
+            </div>
+            <form method="POST" action="/dashboard/logout">
+                <button type="submit" class="logout">Log out</button>
+            </form>
+        </div>
         <p class="sub">
             Installation #{{ repo.installation_id }} ·
             {% if repo.is_enabled %}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
+    <script>
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
+    <title>PR Review Bot — Sign in</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            color: #1f2328;
+            background: #f6f8fa;
+        }
+        .screen {
+            min-height: 100%;
+            display: grid;
+            grid-template-columns: minmax(280px, 1.15fr) minmax(320px, 0.85fr);
+        }
+        .intro {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 48px 56px;
+            background:
+                radial-gradient(900px 480px at -10% -20%, rgba(31, 136, 61, 0.35), transparent 55%),
+                linear-gradient(165deg, #0d1117 0%, #161b22 55%, #122117 100%);
+            color: #f0f3f6;
+        }
+        .mark {
+            font-size: 13px;
+            font-weight: 650;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #7ee787;
+        }
+        .intro-copy { max-width: 460px; }
+        h1 {
+            margin-top: 18px;
+            font-size: 44px;
+            line-height: 1.15;
+            font-weight: 650;
+            letter-spacing: -0.03em;
+        }
+        .lead {
+            margin-top: 16px;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #b1bac4;
+        }
+        .points {
+            display: flex;
+            gap: 28px;
+            margin-top: 56px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(240, 243, 246, 0.12);
+            font-size: 13px;
+            color: #b1bac4;
+        }
+        .points strong { display: block; color: #f0f3f6; font-size: 14px; margin-bottom: 4px; }
+        .panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 32px;
+        }
+        form { width: 100%; max-width: 380px; }
+        .panel h2 { font-size: 28px; letter-spacing: -0.02em; margin-bottom: 8px; }
+        .hint { color: #57606a; font-size: 14px; margin-bottom: 28px; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+        input {
+            width: 100%;
+            height: 44px;
+            padding: 0 14px;
+            margin-bottom: 18px;
+            border: 1px solid #d0d7de;
+            border-radius: 8px;
+            background: #fff;
+            font-size: 15px;
+            color: #1f2328;
+        }
+        input:focus {
+            outline: 2px solid #1f883d;
+            outline-offset: 1px;
+            border-color: #1f883d;
+        }
+        button {
+            width: 100%;
+            height: 44px;
+            margin-top: 6px;
+            border: 0;
+            border-radius: 8px;
+            background: #1f883d;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 650;
+            cursor: pointer;
+        }
+        button:hover { background: #1a7f37; }
+        .error {
+            margin-bottom: 18px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: #ffebe9;
+            color: #d1242f;
+            font-size: 13px;
+        }
+        @media (max-width: 860px) {
+            .screen { grid-template-columns: 1fr; }
+            .intro { min-height: 280px; padding: 32px 24px; }
+            h1 { font-size: 32px; }
+            .points { margin-top: 28px; gap: 16px; }
+            .panel { padding: 32px 24px 48px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="screen">
+        <section class="intro">
+            <p class="mark">PR Review Bot</p>
+            <div class="intro-copy">
+                <h1>Sign in to your review dashboard.</h1>
+                <p class="lead">Manage repositories, branch instructions, and the scores posted on pull requests.</p>
+                <div class="points">
+                    <p><strong>Score</strong>0–100 with a pass threshold</p>
+                    <p><strong>Branches</strong>Custom review instructions</p>
+                    <p><strong>History</strong>Past reviews in one place</p>
+                </div>
+            </div>
+        </section>
+        <section class="panel">
+            <form method="POST" action="/dashboard/login">
+                <h2>Welcome back</h2>
+                <p class="hint">Enter your dashboard username and password.</p>
+                {% if error %}
+                <div class="error">{{ error }}</div>
+                {% endif %}
+                <label for="username">Username</label>
+                <input id="username" type="text" name="username" autocomplete="username" required>
+                <label for="password">Password</label>
+                <input id="password" type="password" name="password" autocomplete="current-password" required>
+                <button type="submit">Sign in</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

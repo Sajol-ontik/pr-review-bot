@@ -1,19 +1,17 @@
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, Request
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import BackgroundTasks, Depends, FastAPI, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
 
-from pr_review.db.session import SessionLocal, init_db
+from pr_review.db.session import SessionLocal, get_db, init_db
 from pr_review.github.webhooks import parse_github_webhook
 from pr_review.review.orchestrator import handle_pr_event
+from pr_review.web.dashboard import index as dashboard_index
 from pr_review.web.dashboard import router as dashboard_router
 
 logger = logging.getLogger(__name__)
-
-templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
 
 
 @asynccontextmanager
@@ -22,7 +20,17 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="PR Review Bot", lifespan=lifespan)
+app = FastAPI(title="PR Review Bot", lifespan=lifespan, redirect_slashes=False)
+
+
+@app.middleware("http")
+async def do_not_cache_dashboard(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/dashboard"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 
 def run_review_in_background(payload: dict, delivery_id: str) -> None:
@@ -66,9 +74,11 @@ async def health():
     return {"status": "healthy"}
 
 
-@app.get("/")
-async def dashboard_index(request: Request):
-    return RedirectResponse(url="/dashboard")
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def root(request: Request, db: Session = Depends(get_db)):
+    # Serve the dashboard here. A redirect to /dashboard makes Chrome wait on the
+    # basic-auth challenge and the page never finishes loading.
+    return await dashboard_index(request, db)
 
 
 app.include_router(dashboard_router)

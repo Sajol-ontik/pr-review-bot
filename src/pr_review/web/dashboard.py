@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -10,31 +13,66 @@ from pr_review.config import settings
 from pr_review.db.models import BranchConfig, Repository, Review
 from pr_review.db.session import get_db
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(prefix="/dashboard", tags=["dashboard"], redirect_slashes=False)
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 DbSession = Annotated[Session, Depends(get_db)]
 
+SESSION_COOKIE = "pr_review_session"
+SESSION_MAX_AGE = 60 * 60 * 24 * 7
 
-def check_auth(request: Request) -> None:
-    auth = request.headers.get("authorization", "")
-    if not auth.startswith("Basic "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    import base64
 
-    decoded = base64.b64decode(auth[6:]).decode()
-    username, _, password = decoded.partition(":")
-    if username != settings.dashboard_username or password != settings.dashboard_password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
+def _session_secret() -> bytes:
+    return settings.dashboard_password.encode()
+
+
+def _session_token() -> str:
+    expires = str(int(time.time()) + SESSION_MAX_AGE)
+    signature = hmac.new(_session_secret(), expires.encode(), hashlib.sha256).hexdigest()
+    return f"{expires}.{signature}"
+
+
+def _cookie_ok(request: Request) -> bool:
+    token = request.cookies.get(SESSION_COOKIE, "")
+    expires, _, signature = token.partition(".")
+    if not expires or not signature:
+        return False
+    expected = hmac.new(_session_secret(), expires.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return False
+    try:
+        return int(expires) > int(time.time())
+    except ValueError:
+        return False
+
+
+def is_authenticated(request: Request) -> bool:
+    # Only the sign-in cookie counts. A saved browser login header would
+    # keep the dashboard open after Log out.
+    return _cookie_ok(request)
+
+
+def login_page(request: Request, error: str = ""):
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"error": error},
+        status_code=status.HTTP_200_OK,
+    )
+
+
+def check_auth(request: Request):
+    """Allow the page to render immediately.
+
+    A 401 with WWW-Authenticate makes Chrome wait on its native login dialog
+    before the dashboard can paint.
+    """
+    if is_authenticated(request):
+        return None
+    if request.method == "GET":
+        return login_page(request)
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def _index_ctx(db: Session) -> dict:
@@ -59,9 +97,39 @@ def _repo_ctx(db: Session, repo: Repository) -> dict:
     return {"repo": repo, "branches": branches, "reviews": reviews}
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.post("/login", response_class=HTMLResponse)
+async def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    if username != settings.dashboard_username or password != settings.dashboard_password:
+        return login_page(request, error="Invalid username or password")
+    response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        SESSION_COOKIE,
+        _session_token(),
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+    return response
+
+
+@router.post("/logout")
+async def logout():
+    response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(SESSION_COOKIE, path="/", httponly=True, samesite="lax")
+    return response
+
+
+@router.get("", response_class=HTMLResponse, name="dashboard")
+@router.get("/", response_class=HTMLResponse, name="dashboard_slash", include_in_schema=False)
 async def index(request: Request, db: DbSession):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     ctx = _index_ctx(db)
     return templates.TemplateResponse(request=request, name="index.html", context=ctx)
 
@@ -74,7 +142,9 @@ async def add_repo(
     repo: str = Form(...),
     installation_id: int = Form(...),
 ):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     existing = (
         db.query(Repository)
         .filter(Repository.owner == owner, Repository.repo == repo)
@@ -93,7 +163,9 @@ async def add_repo(
 
 @router.post("/repos/{repo_id}/toggle")
 async def toggle_repo(request: Request, repo_id: int, db: DbSession):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     repo = db.get(Repository, repo_id)
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -105,7 +177,9 @@ async def toggle_repo(request: Request, repo_id: int, db: DbSession):
 
 @router.post("/repos/{repo_id}/delete")
 async def delete_repo(request: Request, repo_id: int, db: DbSession):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     repo = db.get(Repository, repo_id)
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -116,7 +190,9 @@ async def delete_repo(request: Request, repo_id: int, db: DbSession):
 
 @router.get("/repos/{repo_id}", response_class=HTMLResponse)
 async def repo_detail(request: Request, repo_id: int, db: DbSession):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     repo = db.get(Repository, repo_id)
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -132,7 +208,9 @@ async def add_branch(
     branch: str = Form(...),
     custom_instructions: str = Form(...),
 ):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     repo = db.get(Repository, repo_id)
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -160,7 +238,9 @@ async def add_branch(
 
 @router.post("/branches/{branch_id}/toggle")
 async def toggle_branch(request: Request, branch_id: int, db: DbSession):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     branch = db.get(BranchConfig, branch_id)
     if not branch:
         raise HTTPException(status_code=404, detail="Branch config not found")
@@ -173,7 +253,9 @@ async def toggle_branch(request: Request, branch_id: int, db: DbSession):
 
 @router.post("/branches/{branch_id}/delete")
 async def delete_branch(request: Request, branch_id: int, db: DbSession):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     branch = db.get(BranchConfig, branch_id)
     if not branch:
         raise HTTPException(status_code=404, detail="Branch config not found")
@@ -192,7 +274,9 @@ async def update_branch(
     db: DbSession,
     custom_instructions: str = Form(...),
 ):
-    check_auth(request)
+    denied = check_auth(request)
+    if denied is not None:
+        return denied
     branch = db.get(BranchConfig, branch_id)
     if not branch:
         raise HTTPException(status_code=404, detail="Branch config not found")

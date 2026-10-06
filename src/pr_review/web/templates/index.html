@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
+    <script>
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
     <title>PR Review Bot — Dashboard</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,6 +41,10 @@
         a.repo-link { color: #0969da; text-decoration: none; font-weight: 500; }
         a.repo-link:hover { text-decoration: underline; }
         .empty { text-align: center; color: #57606a; padding: 30px; }
+        .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+        .topbar .sub { margin-bottom: 0; }
+        button.logout { background: #fff; color: #1f2328; border: 1px solid #d0d7de; white-space: nowrap; }
+        button.logout:hover { background: #f3f4f6; }
         .score { font-weight: 700; }
         .score-high { color: #1a7f37; }
         .score-low { color: #d1242f; }
@@ -40,8 +52,15 @@
 </head>
 <body>
     <div class="container">
-        <h1>PR Review Bot</h1>
-        <p class="sub">AI-powered pull request reviews with scoring. Pass threshold: <strong>{{ pass_threshold }}</strong>/100.</p>
+        <div class="topbar">
+            <div>
+                <h1>PR Review Bot</h1>
+                <p class="sub">AI-powered pull request reviews with scoring. Pass threshold: <strong>{{ pass_threshold }}</strong>/100.</p>
+            </div>
+            <form method="POST" action="/dashboard/logout">
+                <button type="submit" class="logout">Log out</button>
+            </form>
+        </div>
 
         <div class="card">
             <h2>Add Repository</h2>
